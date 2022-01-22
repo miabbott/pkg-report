@@ -20,22 +20,6 @@ import requests
 import sys
 
 BASEURL = 'https://rhcos-redirector.ci.openshift.org/art/storage/releases/'
-RELEASES = ['rhcos-4.3',
-            'rhcos-4.4',
-            'rhcos-4.4-ppc64le',
-            'rhcos-4.4-s390x',
-            'rhcos-4.5',
-            'rhcos-4.5-ppc64le',
-            'rhcos-4.5-s390x',
-            'rhcos-4.6',
-            'rhcos-4.6-ppc64le',
-            'rhcos-4.6-s390x',
-            'rhcos-4.7',
-            'rhcos-4.7-ppc64le',
-            'rhcos-4.7-s390x',
-            'rhcos-4.8',
-            'rhcos-4.8-ppc64le',
-            'rhcos-4.8-s390x']
 
 
 def get_builds(release):
@@ -107,10 +91,13 @@ def map_rpm_to_versions(package=None, release=None):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--release', action='store', help='Release to search',
-                        choices=RELEASES)
+    parser.add_argument('--release', action='store', help='Release to search')
     parser.add_argument('--package', action='store', help='Package to query')
     args = parser.parse_args()
+
+    if not args.release.starts_with("rhcos-"):
+        print("Releases must be in the format of 'rhcos-4.X' or 'rhcos-4.X-arch'")
+        sys.exit(1)
 
     try:
         build_package_map = map_rpm_to_versions(package=args.package,
