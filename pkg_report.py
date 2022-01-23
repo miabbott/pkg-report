@@ -18,27 +18,43 @@ from collections import OrderedDict
 import datetime
 import requests
 import sys
+import sqlite3
+
 
 BASEURL = 'https://rhcos-redirector.ci.openshift.org/art/storage/releases/'
 
 
-def get_builds(release):
+def get_builds(cnx, release):
     '''
     Given a release version string, return a sorted list of build numbers
     '''
+
+    cur = cnx.cursor()
+    cur.execute("SELECT id FROM releases WHERE release = (?)", [release])
+    row = cur.fetchone()
+    if row is None:
+        cur.execute("INSERT INTO releases(release) VALUES (?)", [release])
+        cnx.commit()
+
     build_list = []
+    print("SELECTING")
+    for row in cur.execute("SELECT * FROM builds"):
+        print(row)
     builds_url = BASEURL + release + '/builds.json'
     builds_req = requests.get(builds_url)
     if builds_req.status_code != 200:
         raise Exception('Failed to retrieve list of builds')
     for bld in builds_req.json()['builds']:
+        cur.execute("SELECT * FROM builds WHERE build = (?)", [bld])
+        if cur.fectchone() is None:
+            cur.execute("INSERT INTO builds(build, release_id) VALUES (?,?)", [bld, release])
         build_list.append(bld['id'])
 
     build_list.sort()
     return build_list
 
 
-def map_rpm_to_versions(package=None, release=None):
+def map_rpm_to_versions(cnx, package=None, release=None):
     '''
     Given a package/RPM name and a OCP release version string, produce
     an OrderedDict of "version = {previous_version, nvr}" entries
@@ -54,7 +70,7 @@ def map_rpm_to_versions(package=None, release=None):
         arch = split_release[2]
 
     try:
-        release_builds = get_builds(release)
+        release_builds = get_builds(cnx, release)
     except Exception as err:
         raise err
 
@@ -88,6 +104,18 @@ def map_rpm_to_versions(package=None, release=None):
 
     return build_package_map
 
+def db_init(cnx):
+    cur = cnx.cursor()
+    cur.execute('''CREATE TABLE IF NOT EXISTS releases
+               (id INTEGER PRIMARY KEY, release TEXT NOT NULL)''')
+    cur.execute('''CREATE TABLE IF NOT EXISTS builds
+                (id INTEGER PRIMARY KEY, build TEXT NOT NULL,
+                 release_id INTEGER NOT NULL,
+                 FOREIGN KEY (release_id) REFERENCES releases (id))''')
+    cur.execute('''CREATE TABLE IF NOT EXISTS packages
+                (id INTEGER PRIMARY KEY, name TEXT NOT NULL, builds TEXT NOT NULL)''')
+    cnx.commit()
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -95,15 +123,18 @@ def main():
     parser.add_argument('--package', action='store', help='Package to query')
     args = parser.parse_args()
 
-    if not args.release.starts_with("rhcos-"):
+    if not args.release.startswith("rhcos-"):
         print("Releases must be in the format of 'rhcos-4.X' or 'rhcos-4.X-arch'")
         sys.exit(1)
 
+    conn = sqlite3.connect('rhcos.db')
+    db_init(conn)
+
     try:
-        build_package_map = map_rpm_to_versions(package=args.package,
+        build_package_map = map_rpm_to_versions(conn, package=args.package,
                                                 release=args.release)
     except Exception as err:
-        print('Received an Exception while doing the RPM to version'
+        print('Received an Exception while doing the RPM to version '
               f'mapping: {err}')
         sys.exit(1)
 
