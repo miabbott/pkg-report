@@ -95,7 +95,7 @@ def main():
     parser.add_argument('--package', action='store', help='Package to query')
     args = parser.parse_args()
 
-    if not args.release.starts_with("rhcos-"):
+    if not args.release.startswith("rhcos-"):
         print("Releases must be in the format of 'rhcos-4.X' or 'rhcos-4.X-arch'")
         sys.exit(1)
 
@@ -103,7 +103,7 @@ def main():
         build_package_map = map_rpm_to_versions(package=args.package,
                                                 release=args.release)
     except Exception as err:
-        print('Received an Exception while doing the RPM to version'
+        print('Received an Exception while doing the RPM to version '
               f'mapping: {err}')
         sys.exit(1)
 
