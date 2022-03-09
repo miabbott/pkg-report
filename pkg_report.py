@@ -112,10 +112,12 @@ def main():
     if build_package_map:
         for ver in build_package_map.keys():
             prev_ver, rpm = build_package_map[ver]
-            if prev_ver is not None:
+            if prev_ver is not None and prev_ver in build_package_map:
                 pv, pr = build_package_map[prev_ver]
                 if rpm == pr:
                     continue
+            else:
+                print(f"Could not find {prev_ver} in the map")
             ver_s = ver.split('.')
             date = ver_s[2].split('-')[0]
             date_time_obj = datetime.datetime.strptime(date, '%Y%m%d%H%M')
